@@ -17,6 +17,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('services/epoch-service/requirements.txt') }}
       - name: Install dependencies
         working-directory: services/epoch-service
         run: |
@@ -32,6 +37,8 @@ jobs:
         working-directory: services/epoch-service
         run: python -m pytest
 
+
+
   build-java:
     name: Now-Time Service - Build
     runs-on: ubuntu-24.04
@@ -43,6 +50,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
       - name: Build with Gradle
         working-directory: services/now-time-service
         run: ./gradlew build
@@ -72,34 +86,36 @@ jobs:
   integration-test:
     name: Integration Test (Service-to-Service)
     runs-on: ubuntu-24.04
-    needs: [docker-build]
-
+    needs: [test-python, build-java]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Start services
         run: docker compose up -d --build
-
       - name: Wait for Epoch service
         run: |
-          until curl -s http://localhost:8081/epoch -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"date":"2026-06-15T10:00:00Z"}'; do
-            echo "waiting for epoch-service to start..."
-            sleep 2
-          done
-
+          echo "Waiting for epoch-service..."
+          timeout 60 bash -c \
+            'until docker inspect --format="{{.State.Health.Status}}" epoch-service | grep healthy; do sleep 2; done'
       - name: Test Epoch service directly
         run: |
           curl --fail -X POST http://localhost:8081/epoch \
             -H "Content-Type: application/json" \
             -d '{"date":"2026-06-15T10:00:00Z"}'
-
       - name: Test Now-Time service (integration)
         run: |
           curl --fail http://localhost:8080/now
-
+      - name: Run integration tests
+        run: |
+          pip install requests pytest
+          pytest tests/integration
       - name: Shutdown
         if: always()
         run: docker compose down
+      # add logs on failure
+      - name: Debug logs
+        if: failure()
+        run: |
+          echo "===== DOCKER LOGS ====="
+          docker compose ps
+          docker compose logs --tail=200
