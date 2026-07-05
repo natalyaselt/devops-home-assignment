@@ -1,25 +1,24 @@
 services:
-
   epoch-service:
-    build:
-      context: ./services/epoch-service
-
+    build: ./services/epoch-service
     container_name: epoch-service
-
     ports:
       - "8081:8081"
+    command: python -m app.main
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   now-time-service:
-    build:
-      context: ./services/now-time-service
-
+    build: ./services/now-time-service
     container_name: now-time-service
-
-    environment:
-      EPOCH_BASEURL: http://epoch-service:8081
-
-    depends_on:
-      - epoch-service
-
     ports:
       - "8080:8080"
+    environment:
+      - EPOCH_BASEURL=http://epoch-service:8081
+    depends_on:
+      epoch-service:
+        condition: service_healthy

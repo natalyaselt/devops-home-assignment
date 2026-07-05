@@ -17,6 +17,12 @@ register_exception_handlers(app)
 # Register all REST endpoints.
 app.include_router(router)
 
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 # Start the application when this module is executed directly.
 if __name__ == "__main__":
     """

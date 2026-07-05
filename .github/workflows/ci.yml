@@ -13,24 +13,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('services/epoch-service/requirements.txt') }}
       - name: Install dependencies
         working-directory: services/epoch-service
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run Black (format check)
         working-directory: services/epoch-service
         run: python -m black --check app tests
+
       - name: Run Flake8 (lint)
         working-directory: services/epoch-service
         run: python -m flake8 app
+
       - name: Run Pytest
         working-directory: services/epoch-service
         run: python -m pytest
+
 
   build-java:
     name: Now-Time Service - Build
@@ -38,14 +48,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
       - name: Build with Gradle
         working-directory: services/now-time-service
         run: ./gradlew build
+
 
   docker-build:
     name: Docker Build (main only)
@@ -55,16 +74,85 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Build Epoch Service Image
-        run: |
-          docker build -t epoch-service:${{ github.sha }} ./services/epoch-service
+        run: docker build -t epoch-service:${{ github.sha }} ./services/epoch-service
+
       - name: Build Now-Time Service Image
-        run: |
-          docker build -t now-time-service:${{ github.sha }} ./services/now-time-service
+        run: docker build -t now-time-service:${{ github.sha }} ./services/now-time-service
+
       - name: Simulate Push to Registry
         run: |
           echo "Simulating docker push..."
           echo "epoch-service:${{ github.sha }}"
           echo "now-time-service:${{ github.sha }}"
+
+  integration-test:
+    name: Integration Test (Service-to-Service)
+    runs-on: ubuntu-24.04
+    needs: [docker-build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start services
+        run: docker compose up -d --build
+
+      # ✅ WAIT FOR PYTHON SERVICE
+      - name: Wait for Epoch service
+        run: |
+          until curl -s http://localhost:8081/health; do
+            echo "waiting epoch-service..."
+            sleep 2
+          done
+
+      # WAIT FOR JAVA SERVICE
+      - name: Wait for Now-Time service
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/now; then
+              echo "now-time-service is ready"
+              exit 0
+            fi
+            echo "waiting now-time-service..."
+            sleep 2
+          done
+
+          echo "FAILED - dumping logs"
+          docker compose logs now-time-service
+          exit 1
+
+      - name: Test Epoch service directly
+        run: |
+          curl --fail -X POST http://localhost:8081/epoch \
+            -H "Content-Type: application/json" \
+            -d '{"date":"2026-06-15T10:00:00Z"}'
+
+      - name: Test Now-Time service (integration)
+        run: curl --fail http://localhost:8080/now
+
+      - name: Run integration tests
+        run: |
+          pip install requests pytest
+          pytest tests/integration
+
+      - name: Debug logs (on failure)
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs epoch-service
+          docker compose logs now-time-service
+      - name: Shutdown
+        if: always()
+        run: docker compose down
+      # add logs on failure
+      - name: Debug logs
+        if: failure()
+        run: |
+          echo "===== DOCKER LOGS ====="
+          docker compose ps
+          docker compose logs --tail=200
