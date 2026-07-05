@@ -2,62 +2,73 @@
 
 ## Overview
 
-Epoch Service is a simple REST API that receives a date in ISO-8601 format and returns the corresponding Unix Epoch timestamp.
+Epoch Service is a lightweight REST API built with FastAPI.  
+It receives an ISO-8601 formatted date and returns the corresponding Unix epoch timestamp.
 
 ---
 
-## Project Structure
+## Base URL (Docker)
 
 ```
-app/
-    main.py         Application entry point
-    routes.py       REST API endpoints
-    models.py       Request/response models
-    config.py       Configuration loader
 
-config/
-    config.yaml     Application configuration
+[http://localhost:8081](http://localhost:8081)
 
-tests/
-    test_epoch.py   Unit tests
+```
+
+> In Docker Compose, this service is reachable internally as:
+> `http://epoch-service:8081`
+
+---
+
+## Endpoint
+
+### Convert Date to Epoch
+
+```
+
+POST /epoch
+
+````
+
+---
+
+## Request
+
+```json
+{
+  "date": "2026-06-15T10:00:00Z"
+}
+````
+
+* `date` must be a valid ISO-8601 UTC timestamp
+* Required field
+
+---
+
+## Response
+
+```json
+{
+  "epoch": 1781517600
+}
 ```
 
 ---
 
-## Requirements
+## Error Responses
 
-- Python 3.12+
-- pip
-
----
-
-## Installation
-
-Clone the repository.
-
-Install dependencies.
-
-```bash
-pip install -r requirements.txt
-```
-Code formatting (Black)
-```
-python -m black app tests
-```
-Linting (Flake8) checks:
-- unused imports
-- style issues
-- missing whitespace rules
-- code complexity issues
-```
-python -m flake8 app
-```
+| Status Code | Meaning                                          |
+| ----------- | ------------------------------------------------ |
+| 200         | Success                                          |
+| 405         | Method not allowed (e.g., GET instead of POST)   |
+| 422         | Validation error (invalid or missing date field) |
+| 500         | Internal server error                            |
 
 ---
 
 ## Configuration
 
-Application settings are stored in
+Service configuration is defined in:
 
 ```
 config/config.yaml
@@ -68,90 +79,101 @@ Example:
 ```yaml
 server:
   host: 0.0.0.0
-  port: 8080
+  port: 8081
 
 api:
   epoch_endpoint: /epoch
 ```
 
+### Notes
+
+* `host: 0.0.0.0` is required for Docker networking
+* Port may be overridden in Docker Compose
+
 ---
 
-## Running the service
+## Running Locally
 
-### Command line
+### Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Start service
 
 ```bash
 python -m app.main
 ```
-The service starts on the configured host and port.
+
+Service will start on:
+
+```
+http://localhost:8080
+```
 
 ---
 
-## Using the service
+## Running with Docker (Recommended)
 
-POST
+From the monorepo root:
 
-```
-http://localhost:8080/epoch
-```
-
-Request
-
-```json
-{
-    "date": "2026-06-15T10:00:00Z"
-}
+```bash
+docker compose up --build
 ```
 
-Successful response
+---
 
-```json
-{
-    "epoch": 1781517600
-}
-```
+## Example Usage (curl)
 
-## Request example using curl
-
-Request
-```
-curl -i -X POST http://localhost:8080/epoch \
+```bash
+curl -X POST http://localhost:8081/epoch \
   -H "Content-Type: application/json" \
-  -d "{\"date\":\"2026-06-15T11:00:00Z\"}"
-```
-Expected response:
-```
-HTTP/1.1 200 OK
-{
-    "epoch":1781517600
-}
+  -d "{\"date\":\"2026-06-15T10:00:00Z\"}"
 ```
 
 ---
 
-## Error Handling
+## Testing
 
-| Status | Description |
-|---------|-------------|
-|200|Successful request|
-|400|Malformed request|
-|422|Invalid date format|
-|500|Unexpected server error|
+Run unit tests:
 
----
-
-## Running Tests
-From the project root:
 ```bash
 python -m pytest
 ```
 
 ---
 
-## Continuous Integration
+## Code Quality Tools
 
-GitHub Actions automatically:
+### Black (formatter)
 
-- installs dependencies
-- runs unit tests
-- fails the build if any test fails
+Ensures consistent code formatting:
+
+```bash
+python -m black app tests
+```
+
+### Flake8 (linter)
+
+Checks:
+
+* style issues
+* unused imports
+* code complexity
+* PEP8 violations
+
+```bash
+python -m flake8 app
+```
+
+---
+
+## Notes
+
+* This service is stateless
+* Designed for microservice integration
+* Used by `now-time-service` via HTTP call
+* Docker Compose is the recommended execution environment
+
+```

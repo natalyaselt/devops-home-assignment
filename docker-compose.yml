@@ -1,0 +1,25 @@
+services:
+
+  epoch-service:
+    build:
+      context: ./services/epoch-service
+
+    container_name: epoch-service
+
+    ports:
+      - "8081:8081"
+
+  now-time-service:
+    build:
+      context: ./services/now-time-service
+
+    container_name: now-time-service
+
+    environment:
+      EPOCH_BASEURL: http://epoch-service:8081
+
+    depends_on:
+      - epoch-service
+
+    ports:
+      - "8080:8080"
