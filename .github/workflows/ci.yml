@@ -40,8 +40,6 @@ jobs:
       - name: Run Pytest
         working-directory: services/epoch-service
         run: python -m pytest
-
-
   build-java:
     name: Now-Time Service - Build
     runs-on: ubuntu-24.04
@@ -64,11 +62,8 @@ jobs:
       - name: Build with Gradle
         working-directory: services/now-time-service
         run: ./gradlew build
-
-
   docker-build:
-    name: Docker Build (main only)
-    if: github.ref == 'refs/heads/main'
+    name: Docker Build (PR validation)
     runs-on: ubuntu-24.04
     needs: [test-python, build-java]
     steps:
@@ -78,20 +73,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Epoch Service Image
-        run: docker build -t epoch-service:${{ github.sha }} ./services/epoch-service
-
-      - name: Build Now-Time Service Image
-        run: docker build -t now-time-service:${{ github.sha }} ./services/now-time-service
-
-      - name: Simulate Push to Registry
+      - name: Build images
         run: |
-          echo "Simulating docker push..."
-          echo "epoch-service:${{ github.sha }}"
-          echo "now-time-service:${{ github.sha }}"
+          docker build -t epoch-service:${{ github.sha }} ./services/epoch-service
+          docker build -t now-time-service:${{ github.sha }} ./services/now-time-service
+
 
   integration-test:
-    name: Integration Test (Service-to-Service)
+    name: Integration Test (service-to-service)
     runs-on: ubuntu-24.04
     needs: [docker-build]
 
@@ -102,7 +91,6 @@ jobs:
       - name: Start services
         run: docker compose up -d --build
 
-      # ✅ WAIT FOR PYTHON SERVICE
       - name: Wait for Epoch service
         run: |
           until curl -s http://localhost:8081/health; do
@@ -140,19 +128,20 @@ jobs:
           pip install requests pytest
           pytest tests/integration
 
-      - name: Debug logs (on failure)
-        if: failure()
+  main-build:
+    name: Build & Tag (main only)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    needs: [test-python, build-java]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images with tags
         run: |
-          docker compose ps
-          docker compose logs epoch-service
-          docker compose logs now-time-service
-      - name: Shutdown
-        if: always()
-        run: docker compose down
-      # add logs on failure
-      - name: Debug logs
-        if: failure()
+          docker build -t epoch-service:${{ github.sha }} ./services/epoch-service
+          docker build -t now-time-service:${{ github.sha }} ./services/now-time-service
+
+      - name: Simulate registry push
         run: |
-          echo "===== DOCKER LOGS ====="
-          docker compose ps
-          docker compose logs --tail=200
+          echo "push epoch-service:${{ github.sha }}"
+          echo "push now-time-service:${{ github.sha }}"
