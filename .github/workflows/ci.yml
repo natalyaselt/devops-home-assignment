@@ -109,6 +109,9 @@ jobs:
         run: |
           pip install requests pytest
           pytest tests/integration
+      - name: Debug logs
+        if: failure()
+        run: docker compose logs
       - name: Shutdown
         if: always()
         run: docker compose down
