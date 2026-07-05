@@ -15,14 +15,9 @@ public class NowController {
     }
 
     @GetMapping("/now")
-    public ResponseEntity<NowResponse> now() {
-        try {
-            Instant now = Instant.now();
-            long epoch = epochClient.toEpoch(now);
-            return ResponseEntity.ok(new NowResponse("now is " + epoch));
-        } catch (Exception e) {
-            return ResponseEntity.status(503)
-                    .body(new NowResponse("epoch service unavailable"));
-        }
+    public NowResponse now() {
+        Instant now = Instant.now();
+        long epoch = epochClient.toEpoch(now);
+        return new NowResponse("now is " + epoch);
     }
 }
