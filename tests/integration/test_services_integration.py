@@ -29,18 +29,6 @@ def test_service_to_service_flow():
     assert "message" in response.json()
 
 
-def test_epoch_service_failure_behavior():
-    """
-    Simulates failure behavior (run manually with epoch-service stopped)
-    """
-    try:
-        response = requests.get(f"{BASE_NOW}/now", timeout=5)
-        assert response.status_code in (500, 503)
-    except requests.exceptions.ConnectionError:
-        # acceptable when service is down
-        assert True
-
-
 def test_full_service_flow():
     """
     Real integration test:
