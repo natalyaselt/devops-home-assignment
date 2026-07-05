@@ -111,7 +111,10 @@ jobs:
           pytest tests/integration
       - name: Debug logs
         if: failure()
-        run: docker compose logs
+        run: |
+          docker compose ps
+          docker compose logs epoch-service
+          docker compose logs now-time-service
       - name: Shutdown
         if: always()
         run: docker compose down
