@@ -4,18 +4,22 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class NowControllerTest {
 
     @Test
-    void testNowController() {
-        EpochClient mockClient = instant -> 1234567890L;
+    void testNowEndpoint() {
+        EpochClient mockClient = mock(EpochClient.class);
+
+        when(mockClient.toEpoch(any(Instant.class)))
+                .thenReturn(1234567890L);
 
         NowController controller = new NowController(mockClient);
 
         NowResponse response = controller.now();
 
-        assertTrue(response.message().startsWith("now is "));
+        assertEquals("now is 1234567890", response.message());
     }
 }
