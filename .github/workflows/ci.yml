@@ -68,3 +68,38 @@ jobs:
           echo "Simulating docker push..."
           echo "epoch-service:${{ github.sha }}"
           echo "now-time-service:${{ github.sha }}"
+
+  integration-test:
+    name: Integration Test (Service-to-Service)
+    runs-on: ubuntu-24.04
+    needs: [docker-build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start services
+        run: docker compose up -d --build
+
+      - name: Wait for Epoch service
+        run: |
+          until curl -s http://localhost:8081/epoch -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"date":"2026-06-15T10:00:00Z"}'; do
+            echo "waiting for epoch-service to start..."
+            sleep 2
+          done
+
+      - name: Test Epoch service directly
+        run: |
+          curl --fail -X POST http://localhost:8081/epoch \
+            -H "Content-Type: application/json" \
+            -d '{"date":"2026-06-15T10:00:00Z"}'
+
+      - name: Test Now-Time service (integration)
+        run: |
+          curl --fail http://localhost:8080/now
+
+      - name: Shutdown
+        if: always()
+        run: docker compose down
