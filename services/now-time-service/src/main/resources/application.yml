@@ -1,0 +1,7 @@
+server:
+  port: 8080
+
+epoch:
+  # Base URL of the external service exposing POST /epoch.
+  # Override at runtime with EPOCH_BASEURL or --epoch.base-url=...
+  base-url: ${EPOCH_BASEURL:http://localhost:8081}
