@@ -1,24 +1,25 @@
 package com.example.nowtime;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.time.Instant;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-class NowControllerTest {
+public class NowControllerTest {
 
     @Test
-    void wrapsEpochInMessage() {
-        EpochClient epochClient = Mockito.mock(EpochClient.class);
-        Mockito.when(epochClient.toEpoch(any(Instant.class))).thenReturn(1781517600L);
+    void testNowEndpoint() {
+        EpochClient mockClient = mock(EpochClient.class);
 
-        NowController controller = new NowController(epochClient);
+        when(mockClient.toEpoch(any(Instant.class)))
+                .thenReturn(1234567890L);
+
+        NowController controller = new NowController(mockClient);
 
         NowResponse response = controller.now();
 
-        assertThat(response.message()).isEqualTo("now is 1781517600");
+        assertEquals("now is 1234567890", response.message());
     }
 }
